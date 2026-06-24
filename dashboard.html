@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ElectroFlota — Panel de Gestión · Coquimbo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- Mapa de talleres (Leaflet + OpenStreetMap, gratis y sin API key) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Auth de demostración + guard: sin sesión, no se entra -->
+  <script src="auth.js"></script>
+  <script>if(!efSession()) location.replace('index.html');</script>
+  <style>
+    :root{ --corp:#E10600; --corp-dark:#b30500; }
+    html, body { height: 100%; }
+    body{ background:#f3f4f8; margin:0; padding:0; display:flex; flex-direction:column; min-height:100vh;
+      font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    .page-content{ flex:1 0 auto; }
+
+    .dashboard-header{ background:var(--corp); color:#fff; padding:.9rem 2rem; }
+    .dashboard-logo{ width:42px; height:42px; background:#fff; color:var(--corp); border-radius:9px;
+      display:flex; align-items:center; justify-content:center; font-weight:800; font-size:20px; }
+    .role-badge{ font-size:.72rem; font-weight:700; border-radius:999px; padding:.2em .7em; color:#fff; }
+    .live{ display:flex; align-items:center; gap:7px; font-size:.78rem; font-weight:600; color:#fff; opacity:.9; }
+    .live .dot{ width:8px; height:8px; border-radius:50%; background:#7CFFB0; animation:pulse 1.6s infinite; }
+    @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .card{ box-shadow:0 2px 8px rgba(0,0,0,.05); border-radius:18px; transition:.2s; border:1px solid #e2e5f0; }
+    .card:hover{ transform:translateY(-3px); box-shadow:0 4px 12px rgba(0,0,0,.1); }
+    .card-header{ background:#f1f3f4; font-weight:600; border-radius:18px 18px 0 0; }
+    .card-header-with-icon{ display:flex; align-items:center; justify-content:center; gap:.5rem; }
+    .card-header-with-icon i{ font-size:1.3rem; color:var(--corp); }
+    .kpi-value{ font-size:2.4rem; font-weight:800; line-height:1; }
+    .kpi-sub{ color:#6c757d; font-size:.85rem; }
+
+    .pill{ background:#f1f3f4; color:#212529; border-radius:999px; padding:.3em .8em; font-weight:600;
+      font-size:.85em; border:1px solid #e0e0e0; display:inline-block; }
+    .list-item-centered{ display:flex; justify-content:space-between; align-items:center;
+      padding:.6em 1.2em; border-bottom:1px solid #eee; }
+    .list-item-centered:last-child{ border-bottom:none; }
+    .card-fixed-height{ height:400px; display:flex; flex-direction:column; }
+    .card-fixed-height .card-body{ flex:1; overflow-y:auto; }
+    .card-fixed-height .card-body::-webkit-scrollbar{ width:6px; }
+    .card-fixed-height .card-body::-webkit-scrollbar-thumb{ background:#bbb; border-radius:10px; }
+
+    .btn-corp{ background:var(--corp); border-color:var(--corp); color:#fff; }
+    .btn-corp:hover{ background:var(--corp-dark); border-color:var(--corp-dark); color:#fff; }
+
+    .badge.bg-success-subtle{ background:#d1f4e0!important; color:#0f5132!important; border:1px solid #a7e1c4!important; padding:.35em .65em; border-radius:999px; }
+    .badge.bg-warning-subtle{ background:#fff3cd!important; color:#997404!important; border:1px solid #ffe69c!important; padding:.35em .65em; border-radius:999px; }
+    .badge.bg-secondary-subtle{ background:#e2e3e5!important; color:#41464b!important; border:1px solid #c4c8cc!important; padding:.35em .65em; border-radius:999px; }
+    .badge.bg-danger-subtle{ background:#ffe1e0!important; color:#b30500!important; border:1px solid #ffc2c0!important; padding:.35em .65em; border-radius:999px; }
+    .badge.bg-info-subtle{ background:#d7ecff!important; color:#0a4f8a!important; border:1px solid #b3d9ff!important; padding:.35em .65em; border-radius:999px; }
+
+    .prio{ font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .prio-alta{ color:#b30500; } .prio-media{ color:#997404; } .prio-baja{ color:#6c757d; }
+
+    /* timeline ficha (H2) */
+    .tl{ position:relative; padding-left:18px; }
+    .tl::before{ content:""; position:absolute; left:5px; top:4px; bottom:4px; width:2px; background:#e2e5f0; }
+    .ev{ position:relative; padding:0 0 14px 6px; }
+    .ev::before{ content:""; position:absolute; left:-16px; top:3px; width:10px; height:10px; border-radius:50%;
+      background:#0a4f8a; box-shadow:0 0 0 3px #fff; }
+    .ev.crit::before{ background:#E10600; } .ev.prev::before{ background:#E8A220; }
+    .ev .ed{ font-size:.72rem; color:#6c757d; font-family:monospace; }
+    .ev .et{ font-weight:600; font-size:.9rem; margin:1px 0; }
+    .ev .em{ font-size:.82rem; color:#6c757d; }
+
+    .ef-footer{ background:#11161d; color:#c7cfda; padding:1.4rem 0; margin-top:2rem; }
+    .ods{ display:inline-block; font-size:.72rem; font-weight:700; border-radius:6px; padding:.15em .55em; color:#fff; }
+
+    #toast{ position:fixed; bottom:1rem; right:1rem; background:#11161d; color:#fff; padding:.7rem 1.1rem;
+      border-radius:10px; font-size:.9rem; opacity:0; transform:translateY(10px); transition:.25s;
+      pointer-events:none; z-index:1080; max-width:340px; }
+    #toast.show{ opacity:1; transform:none; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="dashboard-header d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-3">
+      <div class="dashboard-logo">EF</div>
+      <div>
+        <span class="fs-4 fw-bold">ElectroFlota</span>
+        <span class="text-white-50 ms-2 d-none d-md-inline">| Panel de gestión · Región de Coquimbo</span>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+      <div class="live d-none d-lg-flex"><span class="dot"></span> GPS EN VIVO</div>
+      <a href="electroflota_3d_v3.html" id="btnSim3d" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-badge-3d"></i> <span class="d-none d-sm-inline">Simulación 3D</span>
+      </a>
+      <div class="text-end lh-1">
+        <div class="fw-semibold small" id="hdrUser">—</div>
+        <span class="role-badge" id="hdrRole">—</span>
+      </div>
+      <button type="button" id="btnLogout" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-box-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="page-content">
+    <div class="container-fluid mt-4 px-4">
+
+      <!-- ============ VISTA GESTIÓN (superadmin + admin de buses) ============ -->
+      <div id="view-gestion" class="d-none">
+        <!-- KPIs -->
+        <div class="row g-3">
+          <div class="col-xl-3 col-lg-6 col-md-6">
+            <div class="card text-center h-100"><div class="card-header-with-icon card-header"><i class="bi bi-bus-front"></i><span>Flota total</span></div>
+              <div class="card-body"><div class="kpi-value">24</div><p class="kpi-sub mb-2">buses eléctricos</p><span class="badge bg-secondary-subtle">Región de Coquimbo</span></div></div>
+          </div>
+          <div class="col-xl-3 col-lg-6 col-md-6">
+            <div class="card text-center h-100"><div class="card-header-with-icon card-header"><i class="bi bi-lightning-charge-fill"></i><span>En ruta</span></div>
+              <div class="card-body"><div class="kpi-value text-success">18</div><p class="kpi-sub mb-2">operativos ahora</p><span class="badge bg-success-subtle">75% disponibilidad</span></div></div>
+          </div>
+          <div class="col-xl-3 col-lg-6 col-md-6">
+            <div class="card text-center h-100"><div class="card-header-with-icon card-header"><i class="bi bi-wrench-adjustable"></i><span>En taller</span></div>
+              <div class="card-body"><div class="kpi-value text-primary">4</div><p class="kpi-sub mb-2">en mantención / reparación</p><span class="badge bg-info-subtle">3 talleres activos</span></div></div>
+          </div>
+          <div class="col-xl-3 col-lg-6 col-md-6">
+            <div class="card text-center h-100"><div class="card-header-with-icon card-header"><i class="bi bi-exclamation-triangle-fill"></i><span>Alertas críticas</span></div>
+              <div class="card-body"><div class="kpi-value" style="color:var(--corp)">3</div><p class="kpi-sub mb-2">predictivas · 48 h</p><span class="badge bg-danger-subtle">requieren acción</span></div></div>
+          </div>
+        </div>
+
+        <!-- Órdenes + Alertas -->
+        <div class="row mt-4 g-3">
+          <div class="col-lg-6 col-md-6">
+            <div class="card card-fixed-height">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clipboard2-check me-2"></i>Órdenes de trabajo</span>
+                <span class="small text-muted" id="ordHint"></span>
+              </div>
+              <div class="card-body px-2"><ul class="list-unstyled mb-0" id="ordenesList"></ul></div>
+            </div>
+          </div>
+          <div class="col-lg-6 col-md-6">
+            <div class="card card-fixed-height">
+              <div class="card-header"><span><i class="bi bi-broadcast-pin me-2"></i>Alertas predictivas</span></div>
+              <div class="card-body px-2" id="alertasList"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Talleres + Repuestos -->
+        <div class="row mt-4 g-3">
+          <div class="col-lg-6 col-md-6">
+            <div class="card card-fixed-height">
+              <div class="card-header"><span><i class="bi bi-buildings me-2"></i>Carga por taller</span></div>
+              <div class="card-body px-3" id="talleresList"></div>
+            </div>
+          </div>
+          <div class="col-lg-6 col-md-6">
+            <div class="card card-fixed-height">
+              <div class="card-header"><span><i class="bi bi-box-seam me-2"></i>Repuestos con stock bajo</span></div>
+              <div class="card-body px-2" id="repuestosList"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mapa de talleres (H9 / J10 / G7) -->
+        <div class="row mt-4 g-3">
+          <div class="col-12">
+            <div class="card">
+              <div class="card-header"><i class="bi bi-geo-alt me-2"></i>Mapa de talleres · Región de Coquimbo</div>
+              <div class="card-body"><div id="mapaTalleres" style="height:340px;border-radius:12px;overflow:hidden"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fila SOLO SUPERADMIN: gestión de usuarios + configuración -->
+        <div class="row mt-4 g-3 mb-3" id="row-superadmin"></div>
+      </div>
+
+      <!-- ============ VISTA MECÁNICO ============ -->
+      <div id="view-mecanico" class="d-none"></div>
+
+      <!-- ============ VISTA CONDUCTOR ============ -->
+      <div id="view-conductor" class="d-none"></div>
+
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="ef-footer">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="dashboard-logo">EF</div>
+        <div>
+          <div class="fw-semibold text-uppercase mb-1" style="font-size:.8rem;letter-spacing:.08em;">ElectroFlota · Coquimbo</div>
+          <div style="font-size:.85rem;">Coordinación de talleres de micros eléctricos</div>
+        </div>
+      </div>
+      <div class="text-end">
+        <div class="mb-2">
+          <span class="ods" style="background:#F36D25">ODS 9</span>
+          <span class="ods" style="background:#FD9D24">ODS 11</span>
+          <span class="ods" style="background:#3F7E44">ODS 13</span>
+        </div>
+        <small class="text-white-50">Proyecto académico · datos simulados · INACAP La Serena</small>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  // ===== Guard de rol =====
+  const session = efRequireSession();   // sin sesión → redirige al login
+
+  // ===== Datos simulados (consistentes con la simulación 3D) =====
+  let ordenes = [
+    { id:1, bus:'BE-126', falla:'Degradación de celdas — pack principal', estado:'En proceso', prio:'alta',  tech:'C. Vega' },
+    { id:2, bus:'BE-118', falla:'Vibración fuera de rango — motor eje trasero', estado:'Aprobada', prio:'alta',  tech:'M. Rojas' },
+    { id:3, bus:'BE-112', falla:'Caída de aislamiento — conector carga DC', estado:'Pendiente', prio:'media', tech:'P. Araya' },
+    { id:4, bus:'BE-105', falla:'Temperatura anómala — inversor de tracción', estado:'Finalizada', prio:'baja',  tech:'J. Pizarro' },
+    { id:5, bus:'BE-141', falla:'Balanceo de celdas (BMS) — pack secundario', estado:'Pendiente', prio:'media', tech:'C. Vega' },
+    { id:6, bus:'BE-130', falla:'Revisión de frenos regenerativos', estado:'En proceso', prio:'media', tech:'M. Rojas' },
+  ];
+  const alertas = [
+    { bus:'BE-126', falla:'Degradación acelerada de celdas', prob:'81%', cuando:'Hoy 09:14' },
+    { bus:'BE-118', falla:'Vibración fuera de rango en motor', prob:'84%', cuando:'Hoy 08:02' },
+    { bus:'BE-112', falla:'Caída de aislamiento en conector DC', prob:'78%', cuando:'Ayer 17:40' },
+  ];
+  const talleres = [
+    { nombre:'Electro-Taller Coquimbo · Bahía 3', comuna:'Coquimbo', ocupados:3, cap:4, lat:-29.9533, lng:-71.3436 },
+    { nombre:'Taller La Serena Norte', comuna:'La Serena', ocupados:1, cap:3, lat:-29.9027, lng:-71.2519 },
+    { nombre:'Taller Ovalle', comuna:'Ovalle', ocupados:0, cap:2, lat:-30.5982, lng:-71.2000 },
+  ];
+  // Turnos de mecánicos por especialidad (J9)
+  const turnos = [
+    { tecnico:'C. Vega',    esp:'Baterías',     turno:'08:00 – 16:00', estado:'En turno' },
+    { tecnico:'J. Pizarro', esp:'Tracción',     turno:'08:00 – 16:00', estado:'En turno' },
+    { tecnico:'P. Araya',   esp:'Electrónica',  turno:'14:00 – 22:00', estado:'Próximo' },
+    { tecnico:'M. Rojas',   esp:'Alto voltaje', turno:'22:00 – 06:00', estado:'Libre' },
+  ];
+  let mapaInit = false;
+  let repuestos = [
+    { nombre:'Inversor de tracción', stock:1, min:2, taller:'Coquimbo' },
+    { nombre:'Módulo de celdas (pack)', stock:2, min:3, taller:'La Serena' },
+    { nombre:'Conector de carga DC', stock:0, min:1, taller:'Coquimbo' },
+    { nombre:'Pastillas freno regenerativo', stock:4, min:6, taller:'Ovalle' },
+  ];
+  const BUSES = {
+    'BE-105':{ patente:'JKLR·82', modelo:'Yutong E12', ruta:'LS-04 · La Serena centro', bat:78, temp:31, salud:96, estado:'En ruta',
+      hist:[ {fecha:'2026-05-12', tipo:'prev', t:'Mantención preventiva 140.000 km', m:'Filtros HV y revisión de pack. Sin observaciones.'},
+             {fecha:'2026-02-28', tipo:'crit', t:'Reemplazo de inversor de tracción', m:'Sobretemperatura recurrente. · C. Vega'},
+             {fecha:'2025-11-03', tipo:'prev', t:'Rotación de neumáticos y frenos', m:'Pastillas delanteras renovadas.'} ] },
+    'BE-126':{ patente:'EWLC·58', modelo:'Yutong E12', ruta:'CQ-05 · Coquimbo sur', bat:41, temp:38, salud:84, estado:'En taller',
+      hist:[ {fecha:'2026-04-02', tipo:'crit', t:'Degradación de celdas — pack principal', m:'2 módulos reemplazados. · C. Vega'},
+             {fecha:'2026-01-21', tipo:'prev', t:'Mantención preventiva 150.000 km', m:'Revisión completa de alto voltaje.'} ] },
+  };
+
+  // ===== Helpers =====
+  const $ = id => document.getElementById(id);
+  const show = (id,on) => $(id).classList.toggle('d-none', !on);
+  const estadoBadge = e => ({ 'Pendiente':'bg-warning-subtle','Aprobada':'bg-info-subtle','En proceso':'bg-info-subtle',
+                              'Finalizada':'bg-success-subtle','Rechazada':'bg-danger-subtle' }[e] || 'bg-secondary-subtle');
+  const ordenById = id => ordenes.find(o=>o.id===id);
+  function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show');
+    clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+  function timeline(hist){ return '<div class="tl">'+hist.map(e=>`
+    <div class="ev ${e.tipo}"><div class="ed">${e.fecha}</div><div class="et">${e.t}</div><div class="em">${e.m}</div></div>`).join('')+'</div>'; }
+
+  // ===== Aplicar rol =====
+  function applyRole(s){
+    $('hdrUser').textContent = s.nombre;
+    const r = EF_ROLES[s.rol];
+    $('hdrRole').textContent = r.label; $('hdrRole').style.background = r.color;
+    const esGestion = (s.rol==='superadmin' || s.rol==='admin_buses');
+    show('btnSim3d', esGestion);                 // Simulación 3D solo gestión
+    show('view-gestion', esGestion);
+    show('view-mecanico', s.rol==='mecanico');
+    show('view-conductor', s.rol==='conductor');
+    if(esGestion){ renderGestion(s); initMapaTalleres(); }
+    if(s.rol==='mecanico') renderMecanico(s);
+    if(s.rol==='conductor') renderConductor(s);
+  }
+
+  // Mapa de talleres con Leaflet + OpenStreetMap (se inicializa una sola vez)
+  function initMapaTalleres(){
+    if(mapaInit || !window.L || !document.getElementById('mapaTalleres')) return;
+    mapaInit = true;
+    const map = L.map('mapaTalleres', { scrollWheelZoom:false }).setView([-30.05, -71.30], 8);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { maxZoom:18, attribution:'© OpenStreetMap' }).addTo(map);
+    talleres.forEach(t => {
+      const pct = Math.round(t.ocupados/t.cap*100);
+      const color = pct>=75 ? '#E10600' : pct>=50 ? '#E8A220' : '#2EBE6C';
+      L.circleMarker([t.lat, t.lng], { radius:10, color:'#fff', weight:2, fillColor:color, fillOpacity:.9 })
+        .addTo(map)
+        .bindPopup(`<b>${t.nombre}</b><br>${t.comuna}<br>${t.ocupados}/${t.cap} buses · ${pct}%`);
+    });
+    setTimeout(()=>map.invalidateSize(), 250);   // por si el contenedor cambió de tamaño
+  }
+
+  // ===== Render GESTIÓN =====
+  function renderGestion(s){
+    const puedeAprobar = (s.rol==='superadmin' || s.rol==='admin_buses');
+    $('ordHint').textContent = puedeAprobar ? 'puedes aprobar / rechazar' : '';
+    $('ordenesList').innerHTML = ordenes.map(o => `
+      <li class="list-item-centered">
+        <div class="me-2">
+          <div class="fw-semibold">${o.bus} <span class="prio prio-${o.prio}">· ${o.prio}</span></div>
+          <div class="text-muted small">${o.falla}</div>
+          <div class="text-muted small"><i class="bi bi-person-gear"></i> ${o.tech}</div>
+          ${ puedeAprobar && o.estado==='Pendiente' ? `
+            <div class="mt-1">
+              <button class="btn btn-success btn-sm py-0 px-2" data-action="aprobar" data-id="${o.id}">Aprobar</button>
+              <button class="btn btn-outline-danger btn-sm py-0 px-2" data-action="rechazar" data-id="${o.id}">Rechazar</button>
+            </div>` : '' }
+        </div>
+        <span class="badge ${estadoBadge(o.estado)}">${o.estado}</span>
+      </li>`).join('');
+
+    $('alertasList').innerHTML = alertas.map(a => `
+      <div class="mb-3 pb-2 border-bottom">
+        <div class="fw-bold d-flex justify-content-between align-items-center">
+          <span>${a.bus}</span><span class="badge bg-danger-subtle">Falla ${a.prob} · 48 h</span></div>
+        <div class="small">${a.falla}</div>
+        <div class="text-muted small"><i class="bi bi-clock-history"></i> ${a.cuando}</div>
+      </div>`).join('');
+
+    $('talleresList').innerHTML = talleres.map(t => {
+      const pct = Math.round(t.ocupados/t.cap*100);
+      const color = pct>=75?'bg-danger':pct>=50?'bg-warning':'bg-success';
+      return `<div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="fw-semibold">${t.nombre}</span><span class="pill">${t.ocupados}/${t.cap} buses</span></div>
+        <div class="text-muted small mb-1"><i class="bi bi-geo-alt"></i> ${t.comuna}</div>
+        <div class="progress" style="height:8px;border-radius:999px;"><div class="progress-bar ${color}" style="width:${pct}%"></div></div>
+      </div>`; }).join('');
+
+    $('repuestosList').innerHTML = repuestos.map(r => {
+      const critico = r.stock<=0 || r.stock < r.min*0.5;
+      return `<div class="list-item-centered">
+        <div><div class="fw-semibold">${r.nombre}</div><div class="text-muted small"><i class="bi bi-geo-alt"></i> ${r.taller}</div></div>
+        <div class="text-end"><div class="fw-bold">${r.stock} <span class="text-muted fw-normal small">/ mín ${r.min}</span></div>
+          <span class="badge ${critico?'bg-danger-subtle':'bg-warning-subtle'}">${critico?'Crítico':'Stock bajo'}</span></div>
+      </div>`; }).join('');
+
+    // Fila exclusiva de SUPERADMIN: gestión de usuarios + configuración del sistema
+    if(s.rol==='superadmin'){
+      $('row-superadmin').innerHTML = `
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-people me-2"></i>Gestión de usuarios <span class="badge bg-danger-subtle ms-1">solo superadmin</span></div>
+            <div class="card-body px-2">
+              ${EF_USERS.map(u=>`<div class="list-item-centered">
+                <div><span class="role-badge me-2" style="background:${EF_ROLES[u.rol].color}">${EF_ROLES[u.rol].label}</span> ${u.nombre}</div>
+                <code class="small text-muted">${u.user}</code></div>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-sliders me-2"></i>Configuración del sistema <span class="badge bg-danger-subtle ms-1">solo superadmin</span></div>
+            <div class="card-body">
+              <label class="form-label small fw-semibold mb-1">Alerta preventiva (A3) — umbral de kilometraje</label>
+              <input type="range" class="form-range" min="5000" max="30000" step="1000" value="20000" oninput="this.nextElementSibling.textContent=Number(this.value).toLocaleString('es-CL')+' km'">
+              <div class="small text-muted mb-3">20.000 km</div>
+              <label class="form-label small fw-semibold mb-1">Priorización (A7) — peso de la criticidad</label>
+              <input type="range" class="form-range" min="0" max="100" step="5" value="60" oninput="this.nextElementSibling.textContent=this.value+'%'">
+              <div class="small text-muted">60%</div>
+            </div>
+          </div>
+        </div>`;
+    } else {
+      $('row-superadmin').innerHTML = '';   // admin de buses NO ve esta fila
+    }
+  }
+
+  // ===== Render MECÁNICO =====
+  function renderMecanico(s){
+    const mis = ordenes.filter(o=>o.tech===s.nombre && o.estado!=='Finalizada' && o.estado!=='Rechazada');
+    const busFicha = (mis[0] && BUSES[mis[0].bus]) ? mis[0].bus : 'BE-126';
+    const b = BUSES[busFicha];
+    $('view-mecanico').innerHTML = `
+      <div class="alert alert-light border d-flex flex-wrap justify-content-between align-items-center">
+        <div><i class="bi bi-buildings text-danger"></i> <strong>${s.taller}</strong></div>
+        <div class="small text-muted"><i class="bi bi-clock"></i> Turno: ${s.turno||'—'} · ${s.cargo}</div>
+      </div>
+      <div class="row g-3">
+        <div class="col-lg-7">
+          <div class="card card-fixed-height">
+            <div class="card-header"><i class="bi bi-clipboard2-pulse me-2"></i>Mis órdenes asignadas</div>
+            <div class="card-body px-2">
+              ${ mis.length ? mis.map(o=>`
+                <div class="list-item-centered">
+                  <div class="me-2">
+                    <div class="fw-semibold">${o.bus} <span class="prio prio-${o.prio}">· ${o.prio}</span></div>
+                    <div class="text-muted small">${o.falla}</div>
+                    <div class="mt-1">
+                      ${ o.estado==='Pendiente'||o.estado==='Aprobada' ? `<button class="btn btn-info btn-sm py-0 px-2" data-action="iniciar" data-id="${o.id}">Iniciar</button>` : '' }
+                      ${ o.estado==='En proceso' ? `<button class="btn btn-success btn-sm py-0 px-2" data-action="finalizar" data-id="${o.id}">Finalizar</button>` : '' }
+                    </div>
+                  </div>
+                  <span class="badge ${estadoBadge(o.estado)}">${o.estado}</span>
+                </div>`).join('') : '<div class="alert alert-info mb-0">No tienes órdenes activas.</div>' }
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="card card-fixed-height">
+            <div class="card-header"><i class="bi bi-bus-front me-2"></i>Ficha del bus · ${busFicha}</div>
+            <div class="card-body">
+              <div class="small text-muted mb-2">${b.patente} · ${b.modelo} · ${b.ruta}</div>
+              <div class="mb-3">
+                <span class="pill me-1">Batería ${b.bat}%</span>
+                <span class="pill me-1">Temp ${b.temp}°C</span>
+                <span class="pill">Salud ${b.salud}%</span>
+              </div>
+              <div class="fw-semibold small text-uppercase text-muted mb-2" style="letter-spacing:.06em">Historial</div>
+              ${timeline(b.hist)}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row g-3 mt-1 mb-3">
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-box-seam me-2"></i>Repuestos del taller</div>
+            <div class="card-body px-2" id="repMec"></div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header"><i class="bi bi-calendar-week me-2"></i>Turnos del taller · hoy</div>
+            <div class="card-body px-2">
+              ${turnos.map(t=>`
+                <div class="list-item-centered ${t.tecnico===s.nombre?'bg-light rounded':''}">
+                  <div>
+                    <div class="fw-semibold">${t.tecnico} ${t.tecnico===s.nombre?'<span class="badge bg-info-subtle ms-1">tú</span>':''}</div>
+                    <div class="text-muted small">${t.esp} · ${t.turno}</div>
+                  </div>
+                  <span class="badge ${t.estado==='En turno'?'bg-success-subtle':t.estado==='Próximo'?'bg-warning-subtle':'bg-secondary-subtle'}">${t.estado}</span>
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    renderRepuestosMec();
+  }
+  function renderRepuestosMec(){
+    if(!$('repMec')) return;
+    $('repMec').innerHTML = repuestos.map(r=>`
+      <div class="list-item-centered">
+        <div><div class="fw-semibold">${r.nombre}</div><div class="text-muted small"><i class="bi bi-geo-alt"></i> ${r.taller}</div></div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="fw-bold">${r.stock}<span class="text-muted fw-normal small"> / mín ${r.min}</span></span>
+          <button class="btn btn-outline-danger btn-sm py-0 px-2" data-action="usar-rep" data-rep="${r.nombre}" ${r.stock<=0?'disabled':''}>Usar 1</button>
+        </div>
+      </div>`).join('');
+  }
+
+  // ===== Render CONDUCTOR =====
+  function renderConductor(s){
+    const b = BUSES[s.bus] || BUSES['BE-105'];
+    $('view-conductor').innerHTML = `
+      <div class="row g-3">
+        <div class="col-lg-5">
+          <div class="card">
+            <div class="card-header"><i class="bi bi-bus-front me-2"></i>Mi bus · ${s.bus}</div>
+            <div class="card-body text-center">
+              <div class="small text-muted mb-2">${b.patente} · ${b.modelo}</div>
+              <span class="badge bg-success-subtle mb-3">● ${b.estado}</span>
+              <div class="row text-center g-2">
+                <div class="col-4"><div class="kpi-value" style="font-size:1.6rem">${b.bat}%</div><div class="kpi-sub">Batería</div></div>
+                <div class="col-4"><div class="kpi-value" style="font-size:1.6rem">${b.temp}°</div><div class="kpi-sub">Temp.</div></div>
+                <div class="col-4"><div class="kpi-value" style="font-size:1.6rem">${b.salud}%</div><div class="kpi-sub">Salud</div></div>
+              </div>
+              <div class="small text-muted mt-3"><i class="bi bi-signpost-2"></i> ${b.ruta}</div>
+            </div>
+          </div>
+          <div class="card mt-3 text-center">
+            <div class="card-header"><i class="bi bi-qr-code me-2"></i>QR del bus</div>
+            <div class="card-body">
+              <i class="bi bi-qr-code" style="font-size:4.5rem;color:#11161d"></i>
+              <p class="small text-muted mt-2">Escanea el QR del bus para ver su historial en terreno.</p>
+              <button class="btn btn-corp btn-sm w-100" data-action="qr">Simular escaneo</button>
+              <div id="qrHist" class="text-start mt-3 d-none"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-7">
+          <div class="card">
+            <div class="card-header"><i class="bi bi-clipboard2-plus me-2"></i>Reportar una falla</div>
+            <div class="card-body">
+              <p class="small text-muted">Marca lo que estás notando y envía el reporte al taller.</p>
+              <form id="formFalla">
+                <div class="row">
+                  ${['Ruido o vibración anormal','Pérdida de potencia','Alerta en tablero','Olor o humo','Falla de frenos','Problema de carga']
+                    .map((sx,i)=>`<div class="col-md-6"><div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="${sx}" id="sx${i}">
+                      <label class="form-check-label small" for="sx${i}">${sx}</label></div></div>`).join('')}
+                </div>
+                <label class="form-label small fw-semibold mt-2 mb-1">Severidad</label>
+                <select class="form-select form-select-sm mb-2" id="sev">
+                  <option>Leve</option><option selected>Media</option><option>Crítica</option>
+                </select>
+                <textarea class="form-control form-control-sm mb-2" id="notas" rows="2" placeholder="Notas (opcional)"></textarea>
+                <button type="submit" class="btn btn-corp btn-sm w-100"><i class="bi bi-send"></i> Enviar reporte</button>
+              </form>
+              <div id="reportes" class="mt-3"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mb-3"></div>`;
+
+    // formulario de reporte de falla (G5)
+    $('formFalla').addEventListener('submit', e=>{
+      e.preventDefault();
+      const sintomas = [...document.querySelectorAll('#formFalla input:checked')].map(c=>c.value);
+      if(!sintomas.length){ toast('Marca al menos un síntoma'); return; }
+      const sev = $('sev').value;
+      const item = document.createElement('div');
+      item.className = 'alert alert-success py-2 small mb-2';
+      item.innerHTML = `<i class="bi bi-check-circle"></i> Reporte enviado para <b>${s.bus}</b> · ${sev} — se generó una alerta para el taller.<br><span class="text-muted">${sintomas.join(', ')}</span>`;
+      $('reportes').prepend(item);
+      e.target.reset();
+      toast('Reporte enviado al taller');
+    });
+  }
+
+  // ===== Acciones (delegación de clicks) =====
+  function setOrden(id, estado){ const o=ordenById(id); if(o) o.estado=estado; rerender(); }
+  function rerender(){ if(session.rol==='mecanico') renderMecanico(session); else applyRoleViews(); }
+  function applyRoleViews(){ if(session.rol==='superadmin'||session.rol==='admin_buses') renderGestion(session); }
+
+  document.addEventListener('click', e=>{
+    const btn = e.target.closest('[data-action]'); if(!btn) return;
+    const act = btn.dataset.action, id = +btn.dataset.id;
+    if(act==='aprobar'){ setOrden(id,'Aprobada'); toast('Orden '+ordenById(id).bus+' aprobada'); }
+    else if(act==='rechazar'){ setOrden(id,'Rechazada'); toast('Orden '+ordenById(id).bus+' rechazada'); }
+    else if(act==='iniciar'){ setOrden(id,'En proceso'); toast('Orden en proceso'); }
+    else if(act==='finalizar'){ setOrden(id,'Finalizada'); toast('Reparación finalizada ✓'); }
+    else if(act==='usar-rep'){
+      const r = repuestos.find(x=>x.nombre===btn.dataset.rep);
+      if(r && r.stock>0){ r.stock--; renderRepuestosMec(); toast('Repuesto usado: '+r.nombre); }
+    }
+    else if(act==='qr'){
+      const b = BUSES[session.bus] || BUSES['BE-105'];
+      const box = $('qrHist'); box.classList.remove('d-none');
+      box.innerHTML = `<div class="fw-semibold small text-uppercase text-muted mb-2" style="letter-spacing:.06em">Historial · ${session.bus}</div>${timeline(b.hist)}`;
+      toast('QR leído · '+session.bus);
+    }
+  });
+
+  // ===== Arranque =====
+  $('btnLogout').addEventListener('click', efLogout);
+  applyRole(session);
+  </script>
+</body>
+</html>
