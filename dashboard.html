@@ -75,6 +75,16 @@
       border-radius:10px; font-size:.9rem; opacity:0; transform:translateY(10px); transition:.25s;
       pointer-events:none; z-index:1080; max-width:340px; }
     #toast.show{ opacity:1; transform:none; }
+
+    /* Mejoras prototipo 2 */
+    .kpi-click{ cursor:pointer; }
+    .kpi-click .kpi-hint{ opacity:.55; font-size:.75rem; }
+    .kpi-click:hover .kpi-hint{ opacity:1; color:var(--corp)!important; }
+    .bus-link{ color:inherit; text-decoration:none; border-bottom:1px dotted #999; }
+    .bus-link:hover{ color:var(--corp); border-bottom-color:var(--corp); }
+    .fila-bus{ cursor:pointer; }
+    .fila-bus:hover{ background:#f6f7f9; }
+    .sugerencia{ background:#fff8e6; border:1px solid #ffe9b3; border-radius:10px; }
   </style>
 </head>
 <body>
@@ -90,6 +100,23 @@
     </div>
     <div class="d-flex align-items-center gap-3">
       <div class="live d-none d-lg-flex"><span class="dot"></span> GPS EN VIVO</div>
+
+      <!-- Centro de alertas (campana) — mejora prototipo 2 -->
+      <div class="dropdown" id="campanaWrap">
+        <button class="btn btn-outline-light btn-sm position-relative" type="button"
+                data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Centro de alertas">
+          <i class="bi bi-bell-fill"></i>
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark d-none" id="campanaBadge"></span>
+        </button>
+        <div class="dropdown-menu dropdown-menu-end shadow border-0 p-0" style="width:min(400px,94vw);border-radius:14px;overflow:hidden">
+          <div class="px-3 py-2 border-bottom fw-semibold small bg-light">
+            <i class="bi bi-bell me-1"></i>Centro de alertas
+            <span class="text-muted fw-normal">· clic fuera para cerrar</span>
+          </div>
+          <div class="px-3 pt-3 pb-1" style="max-height:400px;overflow-y:auto" id="campanaList"></div>
+        </div>
+      </div>
+
       <a href="electroflota_3d_v3.html" id="btnSim3d" class="btn btn-outline-light btn-sm">
         <i class="bi bi-badge-3d"></i> <span class="d-none d-sm-inline">Simulación 3D</span>
       </a>
@@ -108,23 +135,56 @@
 
       <!-- ============ VISTA GESTIÓN (superadmin + admin de buses) ============ -->
       <div id="view-gestion" class="d-none">
-        <!-- KPIs -->
+        <!-- KPIs (clickeables: drill-down a la lista de flota) -->
         <div class="row g-3">
           <div class="col-xl-3 col-lg-6 col-md-6">
-            <div class="card text-center h-100"><div class="card-header-with-icon card-header"><i class="bi bi-bus-front"></i><span>Flota total</span></div>
-              <div class="card-body"><div class="kpi-value">24</div><p class="kpi-sub mb-2">buses eléctricos</p><span class="badge bg-secondary-subtle">Región de Coquimbo</span></div></div>
+            <div class="card text-center h-100 kpi-click" data-action="kpi" data-filter="todos" title="Ver toda la flota">
+              <div class="card-header-with-icon card-header"><i class="bi bi-bus-front"></i><span>Flota total</span></div>
+              <div class="card-body"><div class="kpi-value" id="kpiTotal">—</div><p class="kpi-sub mb-2">buses eléctricos</p><span class="badge bg-secondary-subtle">Región de Coquimbo</span>
+                <div class="kpi-hint mt-2 text-muted"><i class="bi bi-hand-index"></i> clic para ver la lista</div></div></div>
           </div>
           <div class="col-xl-3 col-lg-6 col-md-6">
-            <div class="card text-center h-100"><div class="card-header-with-icon card-header"><i class="bi bi-lightning-charge-fill"></i><span>En ruta</span></div>
-              <div class="card-body"><div class="kpi-value text-success">18</div><p class="kpi-sub mb-2">operativos ahora</p><span class="badge bg-success-subtle">75% disponibilidad</span></div></div>
+            <div class="card text-center h-100 kpi-click" data-action="kpi" data-filter="En ruta" title="Ver buses en ruta">
+              <div class="card-header-with-icon card-header"><i class="bi bi-lightning-charge-fill"></i><span>En ruta</span></div>
+              <div class="card-body"><div class="kpi-value text-success" id="kpiRuta">—</div><p class="kpi-sub mb-2">operativos ahora</p><span class="badge bg-success-subtle" id="kpiDisp">—</span>
+                <div class="kpi-hint mt-2 text-muted"><i class="bi bi-hand-index"></i> clic para ver la lista</div></div></div>
           </div>
           <div class="col-xl-3 col-lg-6 col-md-6">
-            <div class="card text-center h-100"><div class="card-header-with-icon card-header"><i class="bi bi-wrench-adjustable"></i><span>En taller</span></div>
-              <div class="card-body"><div class="kpi-value text-primary">4</div><p class="kpi-sub mb-2">en mantención / reparación</p><span class="badge bg-info-subtle">3 talleres activos</span></div></div>
+            <div class="card text-center h-100 kpi-click" data-action="kpi" data-filter="En taller" title="Ver buses en taller">
+              <div class="card-header-with-icon card-header"><i class="bi bi-wrench-adjustable"></i><span>En taller</span></div>
+              <div class="card-body"><div class="kpi-value text-primary" id="kpiTaller">—</div><p class="kpi-sub mb-2">en mantención / reparación</p><span class="badge bg-info-subtle">3 talleres activos</span>
+                <div class="kpi-hint mt-2 text-muted"><i class="bi bi-hand-index"></i> clic para ver la lista</div></div></div>
           </div>
           <div class="col-xl-3 col-lg-6 col-md-6">
-            <div class="card text-center h-100"><div class="card-header-with-icon card-header"><i class="bi bi-exclamation-triangle-fill"></i><span>Alertas críticas</span></div>
-              <div class="card-body"><div class="kpi-value" style="color:var(--corp)">3</div><p class="kpi-sub mb-2">predictivas · 48 h</p><span class="badge bg-danger-subtle">requieren acción</span></div></div>
+            <div class="card text-center h-100 kpi-click" data-action="kpi" data-filter="alerta" title="Ver buses con alerta activa">
+              <div class="card-header-with-icon card-header"><i class="bi bi-exclamation-triangle-fill"></i><span>Alertas críticas</span></div>
+              <div class="card-body"><div class="kpi-value" style="color:var(--corp)" id="kpiAlertas">—</div><p class="kpi-sub mb-2">predictivas · 48 h</p><span class="badge bg-danger-subtle">requieren acción</span>
+                <div class="kpi-hint mt-2 text-muted"><i class="bi bi-hand-index"></i> clic para ver la lista</div></div></div>
+          </div>
+        </div>
+
+        <!-- Flota: búsqueda y filtros (mejora prototipo 2) -->
+        <div class="row mt-4 g-3">
+          <div class="col-12">
+            <div class="card" id="flotaCard">
+              <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span><i class="bi bi-search me-2"></i>Flota <span class="small text-muted fw-normal" id="flotaHint"></span></span>
+                <div class="d-flex flex-wrap gap-2">
+                  <input id="fBuscar" class="form-control form-control-sm" style="width:190px" placeholder="Buscar ID o patente…">
+                  <select id="fEstado" class="form-select form-select-sm" style="width:180px">
+                    <option value="todos">Estado: todos</option>
+                    <option value="En ruta">En ruta</option>
+                    <option value="En taller">En taller</option>
+                    <option value="Detenido">Detenido</option>
+                    <option value="alerta">Con alerta activa</option>
+                  </select>
+                  <select id="fComuna" class="form-select form-select-sm" style="width:170px">
+                    <option value="todas">Comuna: todas</option>
+                  </select>
+                </div>
+              </div>
+              <div class="card-body px-2 py-1" id="flotaList" style="max-height:330px;overflow-y:auto"></div>
+            </div>
           </div>
         </div>
 
@@ -207,6 +267,19 @@
     </div>
   </footer>
 
+  <!-- Ficha del bus con un clic (mejora prototipo 2) -->
+  <div class="modal fade" id="fichaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+      <div class="modal-content" style="border-radius:18px">
+        <div class="modal-header py-2">
+          <h6 class="modal-title" id="fichaTitle"><i class="bi bi-bus-front me-2"></i>Ficha del bus</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body" id="fichaBody"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -223,15 +296,17 @@
     { id:5, bus:'BE-141', falla:'Balanceo de celdas (BMS) — pack secundario', estado:'Pendiente', prio:'media', tech:'C. Vega' },
     { id:6, bus:'BE-130', falla:'Revisión de frenos regenerativos', estado:'En proceso', prio:'media', tech:'M. Rojas' },
   ];
+  // Alertas gestionables (mejora prototipo 2): estado nueva → vista → atendida/resuelta,
+  // con especialidad requerida para sugerir técnico (A8)
   const alertas = [
-    { bus:'BE-126', falla:'Degradación acelerada de celdas', prob:'81%', cuando:'Hoy 09:14' },
-    { bus:'BE-118', falla:'Vibración fuera de rango en motor', prob:'84%', cuando:'Hoy 08:02' },
-    { bus:'BE-112', falla:'Caída de aislamiento en conector DC', prob:'78%', cuando:'Ayer 17:40' },
+    { id:1, bus:'BE-126', falla:'Degradación acelerada de celdas', prob:'81%', cuando:'Hoy 09:14', esp:'Baterías', estado:'nueva', res:null },
+    { id:2, bus:'BE-118', falla:'Vibración fuera de rango en motor', prob:'84%', cuando:'Hoy 08:02', esp:'Tracción', estado:'nueva', res:null },
+    { id:3, bus:'BE-112', falla:'Caída de aislamiento en conector DC', prob:'78%', cuando:'Ayer 17:40', esp:'Electrónica', estado:'nueva', res:null },
   ];
   const talleres = [
     { nombre:'Electro-Taller Coquimbo · Bahía 3', comuna:'Coquimbo', ocupados:3, cap:4, lat:-29.9533, lng:-71.3436 },
     { nombre:'Taller La Serena Norte', comuna:'La Serena', ocupados:1, cap:3, lat:-29.9027, lng:-71.2519 },
-    { nombre:'Taller Ovalle', comuna:'Ovalle', ocupados:0, cap:2, lat:-30.5982, lng:-71.2000 },
+    { nombre:'Taller La Herradura', comuna:'Coquimbo', ocupados:0, cap:2, lat:-29.9780, lng:-71.3540 },
   ];
   // Turnos de mecánicos por especialidad (J9)
   const turnos = [
@@ -245,7 +320,7 @@
     { nombre:'Inversor de tracción', stock:1, min:2, taller:'Coquimbo' },
     { nombre:'Módulo de celdas (pack)', stock:2, min:3, taller:'La Serena' },
     { nombre:'Conector de carga DC', stock:0, min:1, taller:'Coquimbo' },
-    { nombre:'Pastillas freno regenerativo', stock:4, min:6, taller:'Ovalle' },
+    { nombre:'Pastillas freno regenerativo', stock:4, min:6, taller:'La Herradura' },
   ];
   const BUSES = {
     'BE-105':{ patente:'JKLR·82', modelo:'Yutong E12', ruta:'LS-04 · La Serena centro', bat:78, temp:31, salud:96, estado:'En ruta',
@@ -256,6 +331,56 @@
       hist:[ {fecha:'2026-04-02', tipo:'crit', t:'Degradación de celdas — pack principal', m:'2 módulos reemplazados. · C. Vega'},
              {fecha:'2026-01-21', tipo:'prev', t:'Mantención preventiva 150.000 km', m:'Revisión completa de alto voltaje.'} ] },
   };
+
+  // ===== Flota completa (24 buses) — para búsqueda, filtros y drill-down de KPIs =====
+  const FLOTA = [
+    Object.assign({ id:'BE-105', comuna:'La Serena' }, BUSES['BE-105']),
+    Object.assign({ id:'BE-126', comuna:'Coquimbo', taller:'Electro-Taller Coquimbo · Bahía 3' }, BUSES['BE-126']),
+    { id:'BE-112', patente:'GHSW·44', modelo:'BYD K9FE', comuna:'Coquimbo', ruta:'CQ-02 · Coquimbo centro',
+      bat:57, temp:33, salud:86, estado:'En taller', taller:'Electro-Taller Coquimbo · Bahía 3',
+      hist:[ {fecha:'2026-07-06', tipo:'crit', t:'Caída de aislamiento — conector carga DC', m:'En diagnóstico. · P. Araya'},
+             {fecha:'2026-03-15', tipo:'prev', t:'Mantención preventiva 120.000 km', m:'Sin observaciones.'} ] },
+    { id:'BE-118', patente:'MRTV·23', modelo:'Yutong E12', comuna:'La Serena', ruta:'LS-08 · La Florida',
+      bat:62, temp:41, salud:82, estado:'En taller', taller:'Taller La Serena Norte',
+      hist:[ {fecha:'2026-07-05', tipo:'crit', t:'Vibración fuera de rango — motor eje trasero', m:'Rodamiento en evaluación. · M. Rojas'},
+             {fecha:'2026-04-10', tipo:'prev', t:'Mantención preventiva 130.000 km', m:'Sin observaciones.'} ] },
+    { id:'BE-130', patente:'CPLZ·66', modelo:'Foton eBus U12', comuna:'Coquimbo', ruta:'CQ-09 · Puerto',
+      bat:70, temp:30, salud:90, estado:'En taller', taller:'Electro-Taller Coquimbo · Bahía 3',
+      hist:[ {fecha:'2026-07-04', tipo:'prev', t:'Revisión de frenos regenerativos', m:'En proceso. · M. Rojas'},
+             {fecha:'2026-02-11', tipo:'prev', t:'Mantención preventiva 100.000 km', m:'Sin observaciones.'} ] },
+    { id:'BE-141', patente:'XKDW·35', modelo:'BYD K9FE', comuna:'Coquimbo', ruta:'CQ-10 · La Cantera',
+      bat:48, temp:29, salud:85, estado:'Detenido',
+      hist:[ {fecha:'2026-07-03', tipo:'crit', t:'Balanceo de celdas (BMS) — pack secundario', m:'A la espera de aprobación de la orden.'},
+             {fecha:'2026-01-30', tipo:'prev', t:'Mantención preventiva 110.000 km', m:'Sin observaciones.'} ] },
+    { id:'BE-109', patente:'ZBNM·71', modelo:'Yutong E12', comuna:'La Serena', ruta:'LS-09 · Vegas Norte',
+      bat:15, temp:27, salud:91, estado:'Detenido',
+      hist:[ {fecha:'2026-07-07', tipo:'prev', t:'Carga programada en cochera', m:'Batería bajo el 20%, en carga lenta.'},
+             {fecha:'2026-05-02', tipo:'prev', t:'Mantención preventiva 90.000 km', m:'Sin observaciones.'} ] },
+  ];
+  // 17 buses en ruta (generados con datos plausibles) → total 24: 18 en ruta, 4 en taller, 2 detenidos
+  // Solo comunas de La Serena y Coquimbo (la flota opera en la conurbación)
+  [ ['BE-101','FTXR·31','Yutong E12','La Serena','LS-01 · Av. del Mar'],
+    ['BE-102','HJPK·77','BYD K9FE','Coquimbo','CQ-01 · Parte Alta'],
+    ['BE-103','KWSD·19','Yutong E12','La Serena','LS-02 · Las Compañías'],
+    ['BE-107','LRTM·64','Foton eBus U12','Coquimbo','CQ-03 · Tierras Blancas'],
+    ['BE-110','GPFH·25','BYD K9FE','La Serena','LS-10 · Juan Cisternas'],
+    ['BE-113','JSVW·90','Yutong E12','La Serena','LS-03 · Universidad'],
+    ['BE-115','DKXP·46','Foton eBus U12','Coquimbo','CQ-04 · Guayacán'],
+    ['BE-117','BWRC·73','BYD K9FE','Coquimbo','CQ-11 · San Juan'],
+    ['BE-120','HTKJ·38','Yutong E12','La Serena','LS-05 · La Antena'],
+    ['BE-122','PLMN·52','Foton eBus U12','Coquimbo','CQ-06 · El Llano'],
+    ['BE-124','RSGT·85','BYD K9FE','La Serena','LS-11 · Cerro Grande'],
+    ['BE-128','VXCB·07','Yutong E12','Coquimbo','CQ-12 · La Herradura'],
+    ['BE-133','TWQZ·61','Foton eBus U12','La Serena','LS-06 · Cuatro Esquinas'],
+    ['BE-135','NMKL·29','BYD K9FE','Coquimbo','CQ-07 · Peñuelas'],
+    ['BE-137','QDFR·94','Yutong E12','La Serena','LS-12 · La Pampa'],
+    ['BE-139','SGHJ·16','Foton eBus U12','La Serena','LS-07 · Colina El Pino'],
+    ['BE-143','WYUB·58','BYD K9FE','Coquimbo','CQ-08 · Sindempart'],
+  ].forEach((r,i)=>FLOTA.push({
+    id:r[0], patente:r[1], modelo:r[2], comuna:r[3], ruta:r[4],
+    bat:65+((i*7)%30), temp:26+((i*3)%9), salud:88+((i*5)%12), estado:'En ruta',
+    hist:[ {fecha:`2026-0${1+(i%6)}-1${i%3}`, tipo:'prev', t:'Mantención preventiva programada', m:'Revisión general sin observaciones.'} ]
+  }));
 
   // ===== Helpers =====
   const $ = id => document.getElementById(id);
@@ -268,6 +393,113 @@
   function timeline(hist){ return '<div class="tl">'+hist.map(e=>`
     <div class="ev ${e.tipo}"><div class="ed">${e.fecha}</div><div class="et">${e.t}</div><div class="em">${e.m}</div></div>`).join('')+'</div>'; }
 
+  // ===== Mejoras prototipo 2 =====
+  const busesConAlerta = () => new Set(alertas.filter(a=>a.estado!=='resuelta' && a.estado!=='atendida').map(a=>a.bus));
+  const estadoBusBadge = e => ({ 'En ruta':'bg-success-subtle','En taller':'bg-info-subtle','Detenido':'bg-secondary-subtle' }[e] || 'bg-secondary-subtle');
+  const busLink = id => `<a href="#" class="bus-link fw-semibold" data-action="ficha" data-bus="${id}" title="Abrir ficha e historial">${id}</a>`;
+
+  // A8: sugerir técnico por especialidad + disponibilidad, y taller con menor carga
+  function sugerirTecnico(esp){
+    const rank = { 'En turno':0, 'Próximo':1, 'Libre':2 };
+    return turnos.filter(t=>t.esp===esp).sort((a,b)=>rank[a.estado]-rank[b.estado])[0] || turnos[0];
+  }
+  function sugerirTaller(){
+    return talleres.slice().sort((a,b)=>(a.ocupados/a.cap)-(b.ocupados/b.cap))[0];
+  }
+
+  // Ítem de alerta (se usa en la campana y en la tarjeta de alertas)
+  function alertaHTML(a){
+    const est = { nueva:['Nueva','bg-danger-subtle'], vista:['Vista','bg-warning-subtle'],
+                  atendida:['Atendida','bg-info-subtle'], resuelta:['Resuelta','bg-success-subtle'] }[a.estado];
+    const activa = (a.estado==='nueva' || a.estado==='vista');
+    const tec = sugerirTecnico(a.esp), tal = sugerirTaller();
+    return `<div class="mb-3 pb-2 border-bottom">
+      <div class="fw-bold d-flex justify-content-between align-items-center">
+        <span>${busLink(a.bus)}</span>
+        <span><span class="badge bg-danger-subtle me-1">Falla ${a.prob} · 48 h</span><span class="badge ${est[1]}">${est[0]}</span></span>
+      </div>
+      <div class="small">${a.falla}</div>
+      <div class="text-muted small"><i class="bi bi-clock-history"></i> ${a.cuando} · requiere: ${a.esp}</div>
+      ${ activa ? `
+        <div class="small mt-2 p-2 sugerencia">
+          <i class="bi bi-lightbulb-fill text-warning"></i> Sugerencia:
+          <b>${tec.tecnico}</b> (${a.esp}, ${tec.estado.toLowerCase()}) → <b>${tal.nombre}</b>
+          <div class="mt-1">
+            <button class="btn btn-corp btn-sm py-0 px-2" data-action="alerta-asignar" data-alerta="${a.id}">
+              <i class="bi bi-person-check"></i> Asignar</button>
+            <button class="btn btn-outline-success btn-sm py-0 px-2" data-action="alerta-resolver" data-alerta="${a.id}">Marcar resuelta</button>
+          </div>
+        </div>` : `<div class="small text-muted mt-1"><i class="bi bi-check2-circle text-success"></i> ${a.res||''}</div>` }
+    </div>`;
+  }
+
+  // Campana: badge = alertas nuevas; bandeja con todas
+  function renderCampana(){
+    const nuevas = alertas.filter(a=>a.estado==='nueva').length;
+    const b = $('campanaBadge');
+    b.classList.toggle('d-none', !nuevas);
+    b.textContent = nuevas;
+    $('campanaList').innerHTML = alertas.map(alertaHTML).join('') ||
+      '<div class="text-muted small pb-3">Sin alertas registradas.</div>';
+  }
+
+  // Flota: búsqueda por ID/patente + filtros por estado y comuna
+  function renderFlota(){
+    const q  = $('fBuscar').value.trim().toLowerCase().replace('·','');
+    const fe = $('fEstado').value, fc = $('fComuna').value;
+    const alertaSet = busesConAlerta();
+    const list = FLOTA.filter(b =>
+      (!q  || b.id.toLowerCase().includes(q) || b.patente.toLowerCase().replace('·','').includes(q)) &&
+      (fe==='todos' || (fe==='alerta' ? alertaSet.has(b.id) : b.estado===fe)) &&
+      (fc==='todas' || b.comuna===fc));
+    $('flotaHint').textContent = `· ${list.length} de ${FLOTA.length} buses`;
+    $('flotaList').innerHTML = list.map(b => `
+      <div class="list-item-centered fila-bus" data-action="ficha" data-bus="${b.id}" title="Abrir ficha e historial">
+        <div>
+          <div class="fw-semibold">${b.id} <span class="text-muted fw-normal small">· ${b.patente} · ${b.modelo}</span>
+            ${alertaSet.has(b.id) ? ' <i class="bi bi-exclamation-triangle-fill text-danger"></i>' : ''}</div>
+          <div class="text-muted small"><i class="bi bi-signpost-2"></i> ${b.ruta} · ${b.comuna}</div>
+        </div>
+        <div class="text-end text-nowrap">
+          <span class="pill me-1 d-none d-md-inline"><i class="bi bi-battery-half"></i> ${b.bat}%</span>
+          <span class="badge ${estadoBusBadge(b.estado)}">${b.estado}</span>
+        </div>
+      </div>`).join('') || '<div class="alert alert-info m-3">Sin resultados para ese filtro.</div>';
+  }
+
+  // Drill-down desde un KPI: fija el filtro y baja a la lista
+  function setFiltroKPI(f){
+    $('fBuscar').value = '';
+    $('fEstado').value = f;
+    $('fComuna').value = 'todas';
+    renderFlota();
+    $('flotaCard').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  // Ficha del bus con un clic (modal, desde cualquier lista)
+  function openFicha(id){
+    const b = FLOTA.find(x=>x.id===id);
+    if(!b){ toast('Sin ficha registrada para '+id); return; }
+    const alertasBus = alertas.filter(a=>a.bus===id && a.estado!=='resuelta');
+    $('fichaTitle').innerHTML = `<i class="bi bi-bus-front me-2"></i>${b.id} · ficha e historial`;
+    $('fichaBody').innerHTML = `
+      <div class="small text-muted mb-2">${b.patente} · ${b.modelo} · ${b.ruta} · ${b.comuna}</div>
+      <div class="mb-2">
+        <span class="badge ${estadoBusBadge(b.estado)}">● ${b.estado}</span>
+        ${b.taller ? `<span class="badge bg-info-subtle ms-1"><i class="bi bi-buildings"></i> ${b.taller}</span>` : ''}
+      </div>
+      ${ alertasBus.length ? `<div class="alert alert-danger py-2 small mb-2">
+          <i class="bi bi-exclamation-triangle-fill"></i> ${alertasBus.map(a=>`${a.falla} (${a.prob})`).join(' · ')}</div>` : '' }
+      <div class="mb-3">
+        <span class="pill me-1">Batería ${b.bat}%</span>
+        <span class="pill me-1">Temp ${b.temp}°C</span>
+        <span class="pill">Salud ${b.salud}%</span>
+      </div>
+      <div class="fw-semibold small text-uppercase text-muted mb-2" style="letter-spacing:.06em">Historial</div>
+      ${timeline(b.hist)}`;
+    bootstrap.Modal.getOrCreateInstance($('fichaModal')).show();
+  }
+
   // ===== Aplicar rol =====
   function applyRole(s){
     $('hdrUser').textContent = s.nombre;
@@ -275,10 +507,11 @@
     $('hdrRole').textContent = r.label; $('hdrRole').style.background = r.color;
     const esGestion = (s.rol==='superadmin' || s.rol==='admin_buses');
     show('btnSim3d', esGestion);                 // Simulación 3D solo gestión
+    show('campanaWrap', esGestion);              // Centro de alertas solo gestión
     show('view-gestion', esGestion);
     show('view-mecanico', s.rol==='mecanico');
     show('view-conductor', s.rol==='conductor');
-    if(esGestion){ renderGestion(s); initMapaTalleres(); }
+    if(esGestion){ renderGestion(s); renderFlota(); renderCampana(); initMapaTalleres(); }
     if(s.rol==='mecanico') renderMecanico(s);
     if(s.rol==='conductor') renderConductor(s);
   }
@@ -287,7 +520,7 @@
   function initMapaTalleres(){
     if(mapaInit || !window.L || !document.getElementById('mapaTalleres')) return;
     mapaInit = true;
-    const map = L.map('mapaTalleres', { scrollWheelZoom:false }).setView([-30.05, -71.30], 8);
+    const map = L.map('mapaTalleres', { scrollWheelZoom:false }).setView([-29.94, -71.29], 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       { maxZoom:18, attribution:'© OpenStreetMap' }).addTo(map);
     talleres.forEach(t => {
@@ -302,12 +535,22 @@
 
   // ===== Render GESTIÓN =====
   function renderGestion(s){
+    // KPIs dinámicos (drill-down con clic)
+    const enRuta   = FLOTA.filter(b=>b.estado==='En ruta').length;
+    const enTaller = FLOTA.filter(b=>b.estado==='En taller').length;
+    const activas  = alertas.filter(a=>a.estado!=='resuelta').length;
+    $('kpiTotal').textContent   = FLOTA.length;
+    $('kpiRuta').textContent    = enRuta;
+    $('kpiTaller').textContent  = enTaller;
+    $('kpiAlertas').textContent = activas;
+    $('kpiDisp').textContent    = Math.round(enRuta/FLOTA.length*100) + '% disponibilidad';
+
     const puedeAprobar = (s.rol==='superadmin' || s.rol==='admin_buses');
     $('ordHint').textContent = puedeAprobar ? 'puedes aprobar / rechazar' : '';
     $('ordenesList').innerHTML = ordenes.map(o => `
       <li class="list-item-centered">
         <div class="me-2">
-          <div class="fw-semibold">${o.bus} <span class="prio prio-${o.prio}">· ${o.prio}</span></div>
+          <div class="fw-semibold">${busLink(o.bus)} <span class="prio prio-${o.prio}">· ${o.prio}</span></div>
           <div class="text-muted small">${o.falla}</div>
           <div class="text-muted small"><i class="bi bi-person-gear"></i> ${o.tech}</div>
           ${ puedeAprobar && o.estado==='Pendiente' ? `
@@ -319,13 +562,8 @@
         <span class="badge ${estadoBadge(o.estado)}">${o.estado}</span>
       </li>`).join('');
 
-    $('alertasList').innerHTML = alertas.map(a => `
-      <div class="mb-3 pb-2 border-bottom">
-        <div class="fw-bold d-flex justify-content-between align-items-center">
-          <span>${a.bus}</span><span class="badge bg-danger-subtle">Falla ${a.prob} · 48 h</span></div>
-        <div class="small">${a.falla}</div>
-        <div class="text-muted small"><i class="bi bi-clock-history"></i> ${a.cuando}</div>
-      </div>`).join('');
+    // Alertas con estado, sugerencia de técnico/taller y acciones (mejora prototipo 2)
+    $('alertasList').innerHTML = alertas.map(alertaHTML).join('');
 
     $('talleresList').innerHTML = talleres.map(t => {
       const pct = Math.round(t.ocupados/t.cap*100);
@@ -399,6 +637,8 @@
                     <div class="mt-1">
                       ${ o.estado==='Pendiente'||o.estado==='Aprobada' ? `<button class="btn btn-info btn-sm py-0 px-2" data-action="iniciar" data-id="${o.id}">Iniciar</button>` : '' }
                       ${ o.estado==='En proceso' ? `<button class="btn btn-success btn-sm py-0 px-2" data-action="finalizar" data-id="${o.id}">Finalizar</button>` : '' }
+                      <button class="btn btn-outline-secondary btn-sm py-0 px-2" data-action="qr-mec" data-bus="${o.bus}" title="Escanear el QR del bus en terreno">
+                        <i class="bi bi-qr-code-scan"></i> QR</button>
                     </div>
                   </div>
                   <span class="badge ${estadoBadge(o.estado)}">${o.estado}</span>
@@ -408,7 +648,11 @@
         </div>
         <div class="col-lg-5">
           <div class="card card-fixed-height">
-            <div class="card-header"><i class="bi bi-bus-front me-2"></i>Ficha del bus · ${busFicha}</div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span><i class="bi bi-bus-front me-2"></i>Ficha del bus · ${busFicha}</span>
+              <button class="btn btn-outline-danger btn-sm py-0 px-2" data-action="qr-mec" data-bus="${busFicha}" title="Escanear QR (H8): abre el historial al instante">
+                <i class="bi bi-qr-code-scan"></i> Escanear QR</button>
+            </div>
             <div class="card-body">
               <div class="small text-muted mb-2">${b.patente} · ${b.modelo} · ${b.ruta}</div>
               <div class="mb-3">
@@ -495,7 +739,7 @@
               <p class="small text-muted">Marca lo que estás notando y envía el reporte al taller.</p>
               <form id="formFalla">
                 <div class="row">
-                  ${['Ruido o vibración anormal','Pérdida de potencia','Alerta en tablero','Olor o humo','Falla de frenos','Problema de carga']
+                  ${['Ruido o vibración anormal','Pérdida de potencia','Alerta en tablero','Olor o humo','Falla de frenos','Problema de carga','Otra falla (describir en notas)']
                     .map((sx,i)=>`<div class="col-md-6"><div class="form-check">
                       <input class="form-check-input" type="checkbox" value="${sx}" id="sx${i}">
                       <label class="form-check-label small" for="sx${i}">${sx}</label></div></div>`).join('')}
@@ -504,7 +748,7 @@
                 <select class="form-select form-select-sm mb-2" id="sev">
                   <option>Leve</option><option selected>Media</option><option>Crítica</option>
                 </select>
-                <textarea class="form-control form-control-sm mb-2" id="notas" rows="2" placeholder="Notas (opcional)"></textarea>
+                <textarea class="form-control form-control-sm mb-2" id="notas" rows="2" placeholder='Notas (obligatorias si marcas "Otra falla")'></textarea>
                 <button type="submit" class="btn btn-corp btn-sm w-100"><i class="bi bi-send"></i> Enviar reporte</button>
               </form>
               <div id="reportes" class="mt-3"></div>
@@ -519,10 +763,15 @@
       e.preventDefault();
       const sintomas = [...document.querySelectorAll('#formFalla input:checked')].map(c=>c.value);
       if(!sintomas.length){ toast('Marca al menos un síntoma'); return; }
+      const notas = $('notas').value.trim();
+      // "Otra falla" exige describirla en las notas (texto libre)
+      if(sintomas.some(sx=>sx.startsWith('Otra falla')) && !notas){
+        toast('Describe la falla en las notas antes de enviar'); $('notas').focus(); return;
+      }
       const sev = $('sev').value;
       const item = document.createElement('div');
       item.className = 'alert alert-success py-2 small mb-2';
-      item.innerHTML = `<i class="bi bi-check-circle"></i> Reporte enviado para <b>${s.bus}</b> · ${sev} — se generó una alerta para el taller.<br><span class="text-muted">${sintomas.join(', ')}</span>`;
+      item.innerHTML = `<i class="bi bi-check-circle"></i> Reporte enviado para <b>${s.bus}</b> · ${sev} — se generó una alerta para el taller.<br><span class="text-muted">${sintomas.join(', ')}${notas ? ' — «'+notas+'»' : ''}</span>`;
       $('reportes').prepend(item);
       e.target.reset();
       toast('Reporte enviado al taller');
@@ -530,9 +779,13 @@
   }
 
   // ===== Acciones (delegación de clicks) =====
+  function refreshGestion(){
+    if(session.rol==='superadmin' || session.rol==='admin_buses'){
+      renderGestion(session); renderFlota(); renderCampana();
+    }
+  }
   function setOrden(id, estado){ const o=ordenById(id); if(o) o.estado=estado; rerender(); }
-  function rerender(){ if(session.rol==='mecanico') renderMecanico(session); else applyRoleViews(); }
-  function applyRoleViews(){ if(session.rol==='superadmin'||session.rol==='admin_buses') renderGestion(session); }
+  function rerender(){ if(session.rol==='mecanico') renderMecanico(session); else refreshGestion(); }
 
   document.addEventListener('click', e=>{
     const btn = e.target.closest('[data-action]'); if(!btn) return;
@@ -551,10 +804,51 @@
       box.innerHTML = `<div class="fw-semibold small text-uppercase text-muted mb-2" style="letter-spacing:.06em">Historial · ${session.bus}</div>${timeline(b.hist)}`;
       toast('QR leído · '+session.bus);
     }
+    // ----- Mejoras prototipo 2 -----
+    else if(act==='ficha'){ e.preventDefault(); openFicha(btn.dataset.bus); }
+    else if(act==='qr-mec'){   // lector QR del mecánico (H8): historial inmediato
+      toast('QR leído · '+btn.dataset.bus);
+      openFicha(btn.dataset.bus);
+    }
+    else if(act==='kpi'){ setFiltroKPI(btn.dataset.filter); }
+    else if(act==='alerta-asignar'){
+      const a = alertas.find(x=>x.id===+btn.dataset.alerta); if(!a) return;
+      const tec = sugerirTecnico(a.esp), tal = sugerirTaller();
+      ordenes.unshift({ id: Math.max(...ordenes.map(o=>o.id))+1, bus:a.bus, falla:a.falla,
+                        estado:'Pendiente', prio:'alta', tech:tec.tecnico });
+      a.estado = 'atendida';
+      a.res = `Orden creada · ${tec.tecnico} → ${tal.nombre}`;
+      refreshGestion();
+      toast(`Orden creada: ${a.bus} → ${tec.tecnico} (${tal.nombre})`);
+    }
+    else if(act==='alerta-resolver'){
+      const a = alertas.find(x=>x.id===+btn.dataset.alerta); if(!a) return;
+      a.estado = 'resuelta';
+      a.res = `Resuelta por ${session.nombre} · ${new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}`;
+      refreshGestion();
+      toast('Alerta marcada como resuelta');
+    }
   });
 
   // ===== Arranque =====
   $('btnLogout').addEventListener('click', efLogout);
+
+  // Filtros de flota + comunas únicas
+  [...new Set(FLOTA.map(b=>b.comuna))].sort().forEach(c=>{
+    const opt = document.createElement('option'); opt.value = c; opt.textContent = c;
+    $('fComuna').appendChild(opt);
+  });
+  $('fBuscar').addEventListener('input', renderFlota);
+  $('fEstado').addEventListener('change', renderFlota);
+  $('fComuna').addEventListener('change', renderFlota);
+
+  // Al abrir la campana, las alertas "nuevas" pasan a "vistas"
+  $('campanaWrap').addEventListener('show.bs.dropdown', ()=>{
+    let cambio = false;
+    alertas.forEach(a=>{ if(a.estado==='nueva'){ a.estado='vista'; cambio = true; } });
+    if(cambio) refreshGestion();
+  });
+
   applyRole(session);
   </script>
 </body>
