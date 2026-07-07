@@ -150,6 +150,34 @@
   .ev .et{font-size:13px;font-weight:600;margin:2px 0}
   .ev .em{font-size:12px;color:var(--muted);line-height:1.5}
 
+  /* ---- mejoras prototipo 2 ---- */
+  /* barra de progreso de carga */
+  #loadWrap{width:250px;height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+  #loadBar{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--red),#ff7a68);transition:width .25s}
+
+  /* panel de ayuda de controles */
+  #ayuda{position:fixed;inset:0;z-index:40;background:rgba(8,10,13,.55);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;padding:20px}
+  #ayuda.show{display:flex;animation:slideIn2 .25s ease}
+  #ayuda .hcard{width:min(440px,94vw);background:#11161dF2;border:1px solid var(--line);border-radius:14px;padding:20px}
+  #ayuda h2{font-family:var(--disp);font-size:22px;letter-spacing:.5px}
+  #ayuda .hs{font-family:var(--mono);font-size:11px;color:var(--muted);margin:2px 0 12px}
+  .hrow{display:flex;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .hrow:last-of-type{border-bottom:none}
+  .hkey{font-family:var(--mono);font-size:11px;font-weight:700;background:#0d1218;border:1px solid var(--line);
+    border-radius:6px;padding:4px 9px;white-space:nowrap;color:var(--amber);flex:0 0 auto}
+
+  /* tarjeta flotante del bus seleccionado */
+  #busCard{position:fixed;z-index:15;display:none;width:212px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;backdrop-filter:blur(6px);padding:10px 12px;transform:translate(-50%,-112%)}
+  #busCard .bc-id{font-family:var(--mono);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+  #busCard .bc-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin:2px 0 6px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #busCard .bc-x{cursor:pointer;color:var(--muted);background:none;border:none;font-size:13px;line-height:1}
+  #busCard .bc-x:hover{color:var(--txt)}
+  #busCard .bc-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;padding:3px 0;color:var(--muted)}
+  #busCard .bc-row b{color:var(--txt)}
+
   @media (max-width:780px){
     #fleet{width:188px} #telem{width:186px;padding:10px}
     #alertBox{width:260px} .brand small{display:none}
@@ -162,7 +190,8 @@
 <div id="loading">
   <div class="lg">EF</div>
   <div class="spin"></div>
-  <div class="lt">Cargando modelos 3D…</div>
+  <div id="loadWrap"><i id="loadBar"></i></div>
+  <div class="lt" id="loadTxt">Cargando modelos 3D… 0%</div>
 </div>
 
 <div class="hud" id="top">
@@ -179,7 +208,10 @@
       <button id="camOrbit">Orbital</button>
       <button id="camFollow" class="on">Seguir</button>
       <button id="camAerial">Aérea</button>
+      <button id="camTaller">Taller</button>
     </div>
+    <button class="mini ghost" id="btnReset" title="Restablecer la vista (R)">⟲ Vista</button>
+    <button class="mini ghost" id="btnHelp" title="Ayuda de controles (H)">?</button>
   </div>
 </div>
 
@@ -216,6 +248,30 @@
 </div>
 
 <div class="hud" id="phase">Fase: <b id="phaseTxt">Operación normal — monitoreo en tiempo real</b></div>
+
+<!-- ayuda de controles (mejora prototipo 2) -->
+<div id="ayuda">
+  <div class="hcard">
+    <h2>¿CÓMO MOVERSE?</h2>
+    <div class="hs">Controles de la simulación</div>
+    <div class="hrow"><span class="hkey">Arrastrar</span> Rotar la cámara (en modo Orbital) — la rueda acerca / aleja</div>
+    <div class="hrow"><span class="hkey">Clic en un bus</span> Seleccionarlo y ver su tarjeta de estado</div>
+    <div class="hrow"><span class="hkey">Panel izquierdo</span> Elegir cualquier bus de la flota</div>
+    <div class="hrow"><span class="hkey">O · F · T · L</span> Cámara: Orbital · Seguir · Aérea (T) · Taller (L)</div>
+    <div class="hrow"><span class="hkey">R</span> Restablecer la vista inicial</div>
+    <div class="hrow"><span class="hkey">H</span> Abrir / cerrar esta ayuda</div>
+    <button class="mini" id="ayudaClose" style="width:100%;margin-top:14px">Entendido</button>
+  </div>
+</div>
+
+<!-- tarjeta flotante del bus seleccionado (mejora prototipo 2) -->
+<div id="busCard">
+  <div class="bc-id"><span id="bcId">—</span><button class="bc-x" id="bcClose" title="Cerrar">✕</button></div>
+  <div class="bc-sub" id="bcSub">—</div>
+  <div class="bc-row"><span>Estado</span><b id="bcEstado">—</b></div>
+  <div class="bc-row"><span>Batería</span><b id="bcBat">—</b></div>
+  <div class="bc-row"><span>Temp. inversor</span><b id="bcTemp">—</b></div>
+</div>
 
 <!-- ficha / historial -->
 <div id="ficha">
@@ -696,7 +752,7 @@ const FLEET_DATA = [
      {fecha:'2026-04-18', tipo:'prev', t:'Inspección de carga rápida DC', m:'Conector y aislamiento OK tras alerta menor.'},
      {fecha:'2026-01-09', tipo:'prev', t:'Actualización de firmware BMS', m:'Mejora de balanceo de celdas. · P. Araya'},
    ]},
-  {id:'BE-118', patente:'GPRD·19', modelo:'Foton eBus', ruta:'OV-01 · Ovalle', comuna:'Ovalle',
+  {id:'BE-118', patente:'GPRD·19', modelo:'Foton eBus', ruta:'LS-08 · La Florida', comuna:'La Serena',
    bat:52, temp:36, salud:88, km:121300,
    hist:[
      {fecha:'2026-03-22', tipo:'crit', t:'Falla de motor — eje trasero', m:'Vibración fuera de rango. Rodamiento reemplazado. · M. Rojas'},
@@ -782,6 +838,7 @@ function refreshFleetList(){
 function selectBus(bus, focus){
   if(selected) selected.selRing.visible=false;
   selected=bus; bus.selRing.visible=true;
+  cardOn=true;                      // al seleccionar, la tarjeta flotante reaparece
   renderTelem();
   refreshFleetList();
   if(focus && camMode!=='aerial'){ setCamMode('follow'); }
@@ -799,7 +856,25 @@ function renderTelem(){
   $('tVel').textContent=b.vel+' km/h';
   $('tSalud').textContent=b.salud+'%';
   $('tBadge').innerHTML=`<span class="badge ${st.cls}">● ${st.label}</span>`;
+  renderBusCard();
 }
+
+// Tarjeta flotante sobre el bus seleccionado (mejora prototipo 2):
+// misma información que el panel, anclada al bus en la escena
+let cardOn=true;
+function renderBusCard(){
+  const el=$('busCard');
+  if(!selected || !cardOn){ el.style.display='none'; return; }
+  const b=selected, st=STATUS[b.status];
+  $('bcId').textContent=b.id+' · '+b.patente;
+  $('bcSub').textContent=b.ruta;
+  $('bcEstado').textContent=st.label;
+  $('bcEstado').style.color='#'+st.color.toString(16).padStart(6,'0');
+  $('bcBat').textContent=b.bat+'%';
+  $('bcTemp').textContent=b.temp+'°C';
+  el.style.display='block';
+}
+$('bcClose').addEventListener('click',()=>{ cardOn=false; $('busCard').style.display='none'; });
 
 // ================== UI: ficha / historial (H2) ==================
 function openFicha(bus){
@@ -1024,18 +1099,38 @@ function setCamMode(m){
   $('camOrbit').classList.toggle('on',m==='orbit');
   $('camFollow').classList.toggle('on',m==='follow');
   $('camAerial').classList.toggle('on',m==='aerial');
+  $('camTaller').classList.toggle('on',m==='taller');
   if(m==='orbit'){
     const tgt=selected?selected.group.position:new THREE.Vector3();
     controls.target.copy(tgt);
     controls.update();
   }
 }
+// Restablecer vista (mejora prototipo 2): vuelve al encuadre inicial en modo Seguir
+function resetView(){
+  setCamMode('follow');
+  camera.position.set(-55,30,-60);
+  camTarget.set(0,0,0);
+}
+// Ayuda de controles (mejora prototipo 2)
+function toggleAyuda(force){
+  const el=$('ayuda');
+  const show = force!==undefined ? force : !el.classList.contains('show');
+  el.classList.toggle('show', show);
+  if(!show) localStorage.setItem('ef3d_help','1');   // no volver a mostrarla sola
+}
 $('camOrbit').addEventListener('click',()=>setCamMode('orbit'));
 $('camFollow').addEventListener('click',()=>setCamMode('follow'));
 $('camAerial').addEventListener('click',()=>setCamMode('aerial'));
+$('camTaller').addEventListener('click',()=>setCamMode('taller'));
+$('btnReset').addEventListener('click',resetView);
+$('btnHelp').addEventListener('click',()=>toggleAyuda());
+$('ayudaClose').addEventListener('click',()=>toggleAyuda(false));
+$('ayuda').addEventListener('click',e=>{ if(e.target.id==='ayuda') toggleAyuda(false); });
 addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='o')setCamMode('orbit'); if(k==='f')setCamMode('follow'); if(k==='t')setCamMode('aerial');
+  if(k==='l')setCamMode('taller'); if(k==='r')resetView(); if(k==='h')toggleAyuda();
 });
 
 // ================== TELEMETRÍA (tick 1s) ==================
@@ -1089,6 +1184,19 @@ function animate(){
     if(b.status==='alerta'||b.status==='transito') b.bLight.intensity=1.5+Math.sin(elapsed*10)*1.4;
   });
 
+  // tarjeta flotante: seguir al bus seleccionado en pantalla
+  const cardEl=$('busCard');
+  if(selected && cardEl.style.display==='block'){
+    const p=selected.group.position.clone(); p.y+=5;
+    p.project(camera);
+    if(p.z>1){ cardEl.style.visibility='hidden'; }           // detrás de la cámara
+    else{
+      cardEl.style.visibility='visible';
+      cardEl.style.left=((p.x*.5+.5)*innerWidth)+'px';
+      cardEl.style.top =((-p.y*.5+.5)*innerHeight)+'px';
+    }
+  }
+
   if(camMode==='orbit'){
     controls.update();
   } else {
@@ -1097,6 +1205,9 @@ function animate(){
     if(camMode==='aerial'){
       desired=new THREE.Vector3(0,98,46);
       camTarget.lerp(new THREE.Vector3(0,0,0),.06);
+    } else if(camMode==='taller'){
+      desired=new THREE.Vector3(TALLER.x+17,10,TALLER.z+15);
+      camTarget.lerp(new THREE.Vector3(TALLER.x,2,TALLER.z),.06);
     } else if(focus && focus.status==='taller'){
       desired=new THREE.Vector3(TALLER.x+18,9,TALLER.z+14);
       camTarget.lerp(new THREE.Vector3(TALLER.x,2,TALLER.z),.06);
@@ -1121,6 +1232,14 @@ addEventListener('resize',()=>{
 });
 
 // ================== ARRANQUE ==================
+// Indicador de progreso de carga (mejora prototipo 2): los loaders de three.js
+// reportan cada archivo (obj, mtl, texturas, glb) al DefaultLoadingManager
+THREE.DefaultLoadingManager.onProgress=(url, itemsLoaded, itemsTotal)=>{
+  const p = itemsTotal ? Math.round(itemsLoaded/itemsTotal*100) : 0;
+  $('loadBar').style.width=p+'%';
+  $('loadTxt').textContent=`Cargando modelos 3D… ${p}% (${itemsLoaded}/${itemsTotal})`;
+};
+
 async function init(){
   await loadModels();
   $('mdBus').textContent = loaded.bus?('bus ✔ '+MODELS.bus.type.toUpperCase()):'bus ✗ respaldo';
@@ -1136,6 +1255,7 @@ async function init(){
 
   camera.position.set(-55,30,-60);
   $('loading').style.display='none';
+  if(!localStorage.getItem('ef3d_help')) toggleAyuda(true);   // guía de controles la primera vez
   animate();
 }
 init();
